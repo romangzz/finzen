@@ -1,0 +1,16 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  GREETING: Hello, World!
+
+tasks:
+  init:
+    cmds:
+      - cd ./apps/api && go mod tidy
+  
+  run-api:
+    deps: [init]
+    cmds:
+      - cd ./apps/api/cmd/server && go run main.go

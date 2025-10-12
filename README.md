@@ -17,38 +17,47 @@ It’s built with **Hexagonal Architecture**, **DDD**, **CQS**, and **Event-Driv
 ## 🏁 Getting Started
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/romangzz/finzen.git
 cd finzen
 ```
 
-### 2. Initialize Go module
-```bash
-go mod tidy
-```
+### 2. Run the API
 
-### 3. Run the API
-```bash
-go run cmd/api/main.go
-```
+> **Taskfile is required.** Please refer to [the documentation](https://taskfile.dev/docs/installation) for installation instructions.
 
-### 4. Import your first CSV
 ```bash
-curl -X POST -F "file=@transactions.csv" http://localhost:8080/import
+task run-api
 ```
 
 ## 🧱 Folder Structure
 
 ```bash
 finzen/
-├── cmd/
-│   └── api/                 # Application entry point
-├── internal/
-│   ├── domain/              # Entities, Value Objects, Aggregates
-│   ├── application/         # Commands, Queries, Handlers
-│   ├── infrastructure/      # Repositories, Adapters, CSV Importers
-├── pkg/                     # Shared utilities
-└── go.mod
+├── api/                               # Backend (Go)
+│   ├── cmd/
+│   │   └── server/                    # Application entry point
+│   │       └── main.go
+│   ├── internal/
+│   │   ├── domain/                    # Entities, Value Objects, Aggregates
+│   │   ├── application/               # Commands, Queries, Handlers (CQS)
+│   │   └── infrastructure/            # Repositories, Adapters, CSV Importers
+│   │       ├── http/                  # HTTP controllers / routers
+│   │       ├── persistence/           # DB adapters (Postgres/etc.)
+│   │       └── importer/              # CSV parsers & mappers
+│   ├── pkg/                           # Shared utilities
+│   ├── go.mod
+│   └── go.sum
+├── web/                               # Frontend (React, placeholder)
+│   ├── .gitkeep
+│   └── .gitignore
+├── configs/                           # Static configuration (YAML/JSON)
+│   └── application.yaml
+├── Taskfile.yml                       # Tasks for build/test/run
+├── .gitignore
+└── README.md
+
 ```
 
 ## 🤝 Contributing
