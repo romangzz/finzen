@@ -1,0 +1,21 @@
+# golangci-lint v2 configuration (CI pins v2.15.0, see .github/workflows/ci.yml).
+version: "2"
+
+linters:
+  # The standard set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - bodyclose   # HTTP response bodies are closed
+    - errorlint   # errors compared/wrapped with errors.Is/As and %w
+    - misspell
+    - unconvert   # unnecessary type conversions
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      # Group this module's own imports separately.
+      local-prefixes:
+        - github.com/romangzz/finzen

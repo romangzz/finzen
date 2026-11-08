@@ -1,0 +1,99 @@
+name: CI
+
+# Runs on every PR and on pushes to main. `main` is protected (PR-only), and
+# the `go` and `gitleaks` jobs below are its required status checks: keep the
+# job names stable, or update the `protect-main` ruleset to match.
+#
+# This repo is public and agents commit to it, so:
+# - `pull_request`, never `pull_request_target`: PRs from forks get no secrets
+#   and no write token.
+# - read-only token, credentials not persisted after checkout.
+# - actions pinned to full commit SHAs (tag in the trailing comment).
+# - GitHub-hosted runners only. Never point this at self-hosted runners: on a
+#   public repo, anyone's fork PR would run code on that machine.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: go
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: apps/api/go.mod
+
+      # Same checks as `task ci` locally (Taskfile.yml); keep them in sync.
+      - name: go.mod and go.sum are tidy
+        run: go mod tidy -diff
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Not gofmt-formatted (run: task fmt):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          working-directory: apps/api
+
+      - name: go test
+        run: go test -race -count=1 -coverprofile=coverage.out ./...
+
+      - name: go build
+        run: go build ./...
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: on a public repo every commit ever pushed is
+          # readable, so all of them must be clean, not just the tip.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks (checksum-verified)
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          # -f: fail on HTTP errors instead of saving an error page;
+          # --retry-all-errors: GitHub release downloads intermittently 5xx.
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 -o "$tarball" "$base/$tarball"
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 10 -o checksums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${tarball}\$" checksums.txt | sha256sum -c -
+          tar -xzf "$tarball" gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+
+      - name: Scan full git history for secrets
+        run: gitleaks git --redact --verbose .
