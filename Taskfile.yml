@@ -3,14 +3,45 @@
 version: '3'
 
 vars:
-  GREETING: Hello, World!
+  API_DIR: ./apps/api
 
 tasks:
   init:
     cmds:
-      - cd ./apps/api && go mod tidy
-  
+      - cd {{.API_DIR}} && go mod tidy
+
   run-api:
     deps: [init]
     cmds:
-      - cd ./apps/api/cmd/server && go run main.go
+      - cd {{.API_DIR}}/cmd/server && go run main.go
+
+  fmt:
+    desc: Format Go code (gofmt + goimports via golangci-lint)
+    cmds:
+      - cd {{.API_DIR}} && gofmt -w .
+      - cd {{.API_DIR}} && golangci-lint fmt
+
+  lint:
+    desc: Lint Go code (needs golangci-lint v2, same version as CI)
+    cmds:
+      - cd {{.API_DIR}} && go vet ./...
+      - cd {{.API_DIR}} && golangci-lint run
+
+  test:
+    desc: Run Go tests with the race detector
+    cmds:
+      - cd {{.API_DIR}} && go test -race -count=1 -coverprofile=coverage.out ./...
+
+  build:
+    desc: Build the API
+    cmds:
+      - cd {{.API_DIR}} && go build ./...
+
+  ci:
+    desc: Run every check CI runs (.github/workflows/ci.yml), in the same order
+    cmds:
+      - cd {{.API_DIR}} && go mod tidy -diff
+      - cd {{.API_DIR}} && test -z "$(gofmt -l .)" || (echo "not gofmt-formatted, run task fmt" && gofmt -l . && exit 1)
+      - task: lint
+      - task: test
+      - task: build
